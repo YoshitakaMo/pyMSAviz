@@ -4,7 +4,7 @@ import math
 from collections import Counter
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -36,7 +36,7 @@ class MsaViz:
         color_scheme: str | None = None,
         start: int = 1,
         end: int | None = None,
-        wrap_length: int | None = None,
+        wrap_length: Optional[int] = None,
         wrap_space_size: float = 3.0,
         show_label: bool = True,
         show_seq_char: bool = True,
@@ -62,7 +62,7 @@ class MsaViz:
         start : int, optional
             Start position of visualization (one-based coordinates)
         end : int | None, optional
-            End position of visualization (one-based coordinates)
+            end position of visualization (one-based coordinates)
         wrap_length : int | None, optional
             Wrap sequence length. If None, no wrapping sequence.
         wrap_space_size: float, optional
@@ -91,7 +91,7 @@ class MsaViz:
             content = urlopen(msa).read().decode("utf-8")
             self._msa = AlignIO.read(StringIO(content), format)
         else:
-            self._msa: MultipleSeqAlignment = AlignIO.read(msa, format)
+            self._msa = AlignIO.read(msa, format)
         if sort:
             self._msa = self._sorted_msa_by_njtree(self._msa)
         self._consensus_seq = str(SummaryInfo(self._msa).dumb_consensus(threshold=0))
@@ -107,7 +107,7 @@ class MsaViz:
         self._length = self._end - self._start
 
         # Set user-specified plot configs
-        if wrap_length in (0, None) or wrap_length > self._length:
+        if wrap_length == 0 or wrap_length is None or wrap_length > self._length:
             self._wrap_length = self._length
         else:
             self._wrap_length = wrap_length
@@ -119,7 +119,7 @@ class MsaViz:
         self._show_consensus = show_consensus
         self._consensus_color = consensus_color
         self._consensus_size = consensus_size
-        self._highlight_positions = None
+        self._highlight_positions: Optional[List[int]] = None
         self._pos2marker_kws: dict[int, dict[str, Any]] = {}
         self._pos2text_kws: dict[int, dict[str, Any]] = {}
         self.set_plot_params()
@@ -272,7 +272,7 @@ class MsaViz:
             Max identity threshold for highlight position selection
         """
         ident_list = self._get_consensus_identity_list()
-        highlight_positions: list[int] = []
+        highlight_positions: List[int] = []
         for pos, ident in enumerate(ident_list):
             if min_thr <= ident <= max_thr:
                 highlight_positions.append(pos)
@@ -450,7 +450,7 @@ class MsaViz:
         start : int | None, optional
             Start position. If None, `0` is set.
         end : int | None, optional
-            End position. If None, `alignment_length` is set.
+            end position. If None, `alignment_length` is set.
         """
         # Set xlim, ylim
         start = 0 if start is None else start
@@ -533,7 +533,7 @@ class MsaViz:
         start : int | None, optional
             Start position. If None, `0` is set.
         end : int | None, optional
-            End position. If None, `alignment_length` is set.
+            end position. If None, `alignment_length` is set.
         """
         # Set xlim, ylim
         start = 0 if start is None else start
@@ -573,7 +573,7 @@ class MsaViz:
         start : int | None, optional
             Start position. If None, `0` is set.
         end : int | None, optional
-            End position. If None, `alignment_length` is set.
+            end position. If None, `alignment_length` is set.
 
         Returns
         -------
