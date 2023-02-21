@@ -46,6 +46,7 @@ class MsaViz:
         consensus_color: str = "#1f77b4",
         consensus_size: float = 2.0,
         sort: bool = False,
+        usetex: bool = False,
     ):
         """
         Parameters
@@ -83,6 +84,8 @@ class MsaViz:
             Consensus identity bar height size
         sort : bool, optional
             Sort MSA order by NJ tree constructed from MSA distance matrix
+        usetex : bool, optional
+            If True, use LaTeX for rendering text
         """
         # Load MSA
         if isinstance(msa, MultipleSeqAlignment):
@@ -119,6 +122,7 @@ class MsaViz:
         self._show_consensus = show_consensus
         self._consensus_color = consensus_color
         self._consensus_size = consensus_size
+        self._usetex = usetex
         self._highlight_positions: Optional[List[int]] = None
         self._pos2marker_kws: dict[int, dict[str, Any]] = {}
         self._pos2text_kws: dict[int, dict[str, Any]] = {}
@@ -204,6 +208,7 @@ class MsaViz:
         show_consensus_char: bool = True,
         identity_color: str = "#A3A5FF",
         identity_color_min_thr: float = 30,
+        usetex: bool = False,
     ) -> None:
         """Set plot parameters to adjust figure appearence in detail
 
@@ -379,6 +384,17 @@ class MsaViz:
             if wrap_idx != self.wrap_num:
                 plot_ax_types.append(AxesType.WRAP_SPACE)
 
+        # usetex
+        if self._usetex:
+            plt.rcParams["ps.useafm"] = True
+            plt.rcParams["pdf.use14corefonts"] = True
+            plt.rcParams["text.usetex"] = True
+            plt.rcParams["text.latex.preamble"] = [
+                r"\usepackage{sansmath}",
+                r"\sansmath",
+            ]
+            plt.rcParams["font.family"] = "sans-serif"
+            plt.rcParams["font.sans-serif"] = "Helvetica"
         y_size_list = [ax_type2y_size[t] for t in plot_ax_types]
         figsize = (self._wrap_length * self._x_unit_size, sum(y_size_list))
         fig: Figure = plt.figure(figsize=figsize, dpi=dpi, tight_layout=True)
