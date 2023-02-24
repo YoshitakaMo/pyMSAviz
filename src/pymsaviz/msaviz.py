@@ -46,6 +46,7 @@ class MsaViz:
         consensus_color: str = "#1f77b4",
         consensus_size: float = 2.0,
         sort: bool = False,
+        bfactors: List[List[Optional[float]]] | None = None,
         usetex: bool = False,
     ):
         """
@@ -59,7 +60,7 @@ class MsaViz:
             Color scheme. If None, `Zappo`(AA) or `Nucleotide`(NT) is set.
             [`Clustal`|`Zappo`|`Taylor`|`Flower`|`Blossom`|`Sunset`|`Ocean`|
             `Hydrophobicity`|`HelixPropensity`|`StrandPropensity`|`TurnPropensity`|
-            `BuriedIndex`|`Nucleotide`|`Purine/Pyrimidine`|`Identity`|`None`]
+            `BuriedIndex`|`Nucleotide`|`Purine/Pyrimidine`|`Identity`|`AlphaFold_pLDDT`|`None`]
         start : int, optional
             Start position of visualization (one-based coordinates)
         end : int | None, optional
@@ -84,6 +85,8 @@ class MsaViz:
             Consensus identity bar height size
         sort : bool, optional
             Sort MSA order by NJ tree constructed from MSA distance matrix
+        bfactors: List[List[Optional[float]]], optional
+            B-factors for coloring MSA. If None, no coloring.
         usetex : bool, optional
             If True, use LaTeX for rendering text
         """
@@ -124,6 +127,7 @@ class MsaViz:
         self._consensus_size = consensus_size
         self._usetex = usetex
         self._highlight_positions: Optional[List[int]] = None
+        self._bfactors = bfactors
         self._pos2marker_kws: dict[int, dict[str, Any]] = {}
         self._pos2text_kws: dict[int, dict[str, Any]] = {}
         self.set_plot_params()
@@ -208,7 +212,6 @@ class MsaViz:
         show_consensus_char: bool = True,
         identity_color: str = "#A3A5FF",
         identity_color_min_thr: float = 30,
-        usetex: bool = False,
     ) -> None:
         """Set plot parameters to adjust figure appearence in detail
 
@@ -455,7 +458,10 @@ class MsaViz:
     ############################################################
 
     def _plot_msa(
-        self, ax: Axes, start: int | None = None, end: int | None = None
+        self,
+        ax: Axes,
+        start: int | None = None,
+        end: int | None = None,
     ) -> None:
         """Plot MSA
 
@@ -513,6 +519,10 @@ class MsaViz:
                     color = self.color_scheme.get(seq_char, "#FFFFFF")
                     if self._color_scheme_name == "Identity":
                         color = self._get_identity_color(seq_char, x_left)
+                    if self._color_scheme_name == "AlphaFold_pLDDT":
+                        if self._bfactors is None:
+                            raise ValueError("bfactors must be set.")
+                        color = self._get_plddt_color(cnt, x_left, self._bfactors)
                     rect_prop.update(**dict(color=color, lw=0, fill=True))
                 if self._show_grid:
                     rect_prop.update(**dict(ec=self._grid_color, lw=0.5))
@@ -670,6 +680,34 @@ class MsaViz:
             return self._get_interpolate_colors(color, [identity], vmin=color_thr)[0]
         else:
             return "#FFFFFF"
+
+    def _get_plddt_color(self, cnt: int, pos: int, bfactors) -> str:
+        """Get pLDDT color for `AlphaFold_pLDDT` color scheme
+
+        Parameters
+        ----------
+        cnt : int
+            Typically, the row number of aligned MSA sequences.
+        pos : int
+            Typically, the column number of aligned MSA sequences.
+        bfactors : List[List[Optional[float]]]
+            b-factors of aligned MSA sequences.
+
+        Returns
+        -------
+        plddt_color : str
+            pLDDT color
+        """
+        if bfactors[cnt][pos] is None:
+            return "#FFFFFF"
+        elif bfactors[cnt][pos] > 90.0:
+            return "#0053D6"
+        elif bfactors[cnt][pos] > 70.0:
+            return "#65CBF3"
+        elif bfactors[cnt][pos] > 50.0:
+            return "#FFDB13"
+        else:
+            return "#FF7D45"
 
     def _is_aa_msa(self) -> bool:
         """Check MSA is `aa` or `nt`
