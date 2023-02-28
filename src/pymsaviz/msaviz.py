@@ -46,7 +46,7 @@ class MsaViz:
         consensus_color: str = "#1f77b4",
         consensus_size: float = 2.0,
         sort: bool = False,
-        bfactors: List[List[Optional[float]]] | None = None,
+        arrays: List[List[Optional[float]]] | None = None,
         usetex: bool = False,
     ):
         """
@@ -60,7 +60,8 @@ class MsaViz:
             Color scheme. If None, `Zappo`(AA) or `Nucleotide`(NT) is set.
             [`Clustal`|`Zappo`|`Taylor`|`Flower`|`Blossom`|`Sunset`|`Ocean`|
             `Hydrophobicity`|`HelixPropensity`|`StrandPropensity`|`TurnPropensity`|
-            `BuriedIndex`|`Nucleotide`|`Purine/Pyrimidine`|`Identity`|`AlphaFold_pLDDT`|`None`]
+            `BuriedIndex`|`Nucleotide`|`Purine/Pyrimidine`|`Identity`|`AlphaFold_pLDDT`|
+            `DeltaG`|`None`]
         start : int, optional
             Start position of visualization (one-based coordinates)
         end : int | None, optional
@@ -85,8 +86,8 @@ class MsaViz:
             Consensus identity bar height size
         sort : bool, optional
             Sort MSA order by NJ tree constructed from MSA distance matrix
-        bfactors: List[List[Optional[float]]], optional
-            B-factors for coloring MSA. If None, no coloring.
+        arrays: List[List[Optional[float]]], optional
+            arrays for coloring MSA. If None, no coloring.
         usetex : bool, optional
             If True, use LaTeX for rendering text
         """
@@ -127,7 +128,7 @@ class MsaViz:
         self._consensus_size = consensus_size
         self._usetex = usetex
         self._highlight_positions: Optional[List[int]] = None
-        self._bfactors = bfactors
+        self._arrays = arrays
         self._pos2marker_kws: dict[int, dict[str, Any]] = {}
         self._pos2text_kws: dict[int, dict[str, Any]] = {}
         self.set_plot_params()
@@ -519,10 +520,16 @@ class MsaViz:
                     color = self.color_scheme.get(seq_char, "#FFFFFF")
                     if self._color_scheme_name == "Identity":
                         color = self._get_identity_color(seq_char, x_left)
-                    if self._color_scheme_name == "AlphaFold_pLDDT":
-                        if self._bfactors is None:
-                            raise ValueError("bfactors must be set.")
-                        color = self._get_plddt_color(cnt, x_left, self._bfactors)
+                    if (
+                        self._color_scheme_name == "AlphaFold_pLDDT"
+                        or self._color_scheme_name == "DeltaG"
+                    ):
+                        if self._arrays is None:
+                            raise ValueError("arrays must be set.")
+                        if self._color_scheme_name == "AlphaFold_pLDDT":
+                            color = self._get_plddt_color(cnt, x_left, self._arrays)
+                        elif self._color_scheme_name == "DeltaG":
+                            color = self._get_deltag_color(cnt, x_left, self._arrays)
                     rect_prop.update(**dict(color=color, lw=0, fill=True))
                 if self._show_grid:
                     rect_prop.update(**dict(ec=self._grid_color, lw=0.5))
@@ -681,7 +688,7 @@ class MsaViz:
         else:
             return "#FFFFFF"
 
-    def _get_plddt_color(self, cnt: int, pos: int, bfactors) -> str:
+    def _get_plddt_color(self, cnt: int, pos: int, arrays) -> str:
         """Get pLDDT color for `AlphaFold_pLDDT` color scheme
 
         Parameters
@@ -690,24 +697,65 @@ class MsaViz:
             Typically, the row number of aligned MSA sequences.
         pos : int
             Typically, the column number of aligned MSA sequences.
-        bfactors : List[List[Optional[float]]]
-            b-factors of aligned MSA sequences.
+        arrays : List[List[Optional[float]]]
+            arrays of aligned MSA sequences.
 
         Returns
         -------
         plddt_color : str
             pLDDT color
         """
-        if bfactors[cnt][pos] is None:
+        if arrays[cnt][pos] is None:
             return "#FFFFFF"
-        elif bfactors[cnt][pos] > 90.0:
+        elif arrays[cnt][pos] > 90.0:
             return "#0053D6"
-        elif bfactors[cnt][pos] > 70.0:
+        elif arrays[cnt][pos] > 70.0:
             return "#65CBF3"
-        elif bfactors[cnt][pos] > 50.0:
+        elif arrays[cnt][pos] > 50.0:
             return "#FFDB13"
         else:
             return "#FF7D45"
+
+    def _get_deltag_color(
+        self,
+        cnt: int,
+        pos: int,
+        arrays,
+        min: float = -10.0,
+        max: float = 0.0,
+    ) -> str:
+        """Get DeltaG color for `DeltaG` color scheme
+
+        Parameters
+        ----------
+        cnt : int
+            Typically, the row number of aligned MSA sequences.
+        pos : int
+            Typically, the column number of aligned MSA sequences.
+        arrays : list[list[Optional[float]]]
+            arrays of gap-inserted deltaG values.
+        min : float, optional
+            Min value, by default -10.0
+        max : float, optional
+            Max value, by default 0.0
+
+        Returns
+        -------
+        deltag_color : str
+            DeltaG color code
+        """
+        if arrays[cnt][pos] is None:
+            return "#FFFFFF"
+        elif arrays[cnt][pos] < min:
+            return "#FF0000"
+        elif arrays[cnt][pos] > max:
+            return "#FFFFFF"
+        else:
+            # Interpolate color
+            norm = colors.Normalize(vmin=-10, vmax=0)
+            cmap = colors.LinearSegmentedColormap.from_list("", ["red", "white"])
+            rgba = cmap(norm(arrays[cnt][pos]))
+            return colors.to_hex(rgba)
 
     def _is_aa_msa(self) -> bool:
         """Check MSA is `aa` or `nt`
